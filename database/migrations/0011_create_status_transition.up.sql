@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS status_transition (
   from_status VARCHAR(40) NOT NULL,
   to_status VARCHAR(40) NOT NULL,
   changed_by_user_id CHAR(36) NOT NULL,
-  changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  changed_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   CONSTRAINT pk_status_transition PRIMARY KEY (id),
   CONSTRAINT fk_status_transition_service_order FOREIGN KEY (service_order_id)
     REFERENCES service_order (id) ON DELETE CASCADE,

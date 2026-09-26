@@ -53,6 +53,8 @@ func classify(err error) (int, string, string) {
 		return http.StatusUnprocessableEntity, "invalid_transition", "Transicion de estado no permitida."
 	case errors.Is(err, domain.ErrTechnicianRequired):
 		return http.StatusUnprocessableEntity, "technician_required", "Se requiere asignar un tecnico responsable antes de iniciar el diagnostico o reparacion."
+	case errors.Is(err, domain.ErrWeakPassword):
+		return http.StatusBadRequest, "weak_password", "La contraseña no cumple con los requisitos de complejidad (mínimo 8 caracteres, mayúscula, minúscula, número y caracter especial)."
 	case errors.Is(err, domain.ErrInvalidInput):
 		return http.StatusBadRequest, "invalid_input", invalidInputMessage(err)
 	default:

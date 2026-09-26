@@ -20,15 +20,24 @@ type registerInterventionRequest struct {
 	Part           []partUsagePayload `json:"part"`
 }
 
+// interventionWarrantyResponse summarizes warranty coverage for an intervention.
+type interventionWarrantyResponse struct {
+	ID                 string `json:"id,omitempty"`
+	Valid              bool   `json:"valid"`
+	Kind               string `json:"kind,omitempty"`
+	CoverageMonthCount int    `json:"coverageMonthCount,omitempty"`
+}
+
 // interventionResponse is one entry of the intervention list.
 type interventionResponse struct {
-	ID             string             `json:"id"`
-	ServiceOrderID string             `json:"serviceOrderId"`
-	TechnicianID   string             `json:"technicianId"`
-	Description    string             `json:"description"`
-	LaborHourCount float64            `json:"laborHourCount"`
-	PerformedAt    string             `json:"performedAt"`
-	Part           []partUsagePayload `json:"part"`
+	ID             string                        `json:"id"`
+	ServiceOrderID string                        `json:"serviceOrderId"`
+	TechnicianID   string                        `json:"technicianId"`
+	Description    string                        `json:"description"`
+	LaborHourCount float64                       `json:"laborHourCount"`
+	PerformedAt    string                        `json:"performedAt"`
+	Part           []partUsagePayload            `json:"part"`
+	Warranty       *interventionWarrantyResponse `json:"warranty,omitempty"`
 }
 
 // InterventionHandler exposes the work executed on a vehicle.
@@ -87,6 +96,15 @@ func toInterventionResponse(intervention domain.Intervention) interventionRespon
 	for _, item := range intervention.Part {
 		part = append(part, partUsagePayload{PartName: item.PartName, Quantity: item.Quantity})
 	}
+	var warranty *interventionWarrantyResponse
+	if intervention.Warranty != nil {
+		warranty = &interventionWarrantyResponse{
+			ID:                 intervention.Warranty.ID,
+			Valid:              intervention.Warranty.Valid,
+			Kind:               intervention.Warranty.Kind,
+			CoverageMonthCount: intervention.Warranty.CoverageMonthCount,
+		}
+	}
 	return interventionResponse{
 		ID:             intervention.ID,
 		ServiceOrderID: intervention.ServiceOrderID,
@@ -95,5 +113,6 @@ func toInterventionResponse(intervention domain.Intervention) interventionRespon
 		LaborHourCount: intervention.LaborHourCount,
 		PerformedAt:    formatTime(intervention.PerformedAt),
 		Part:           part,
+		Warranty:       warranty,
 	}
 }

@@ -13,10 +13,23 @@ export interface Session {
   username: string;
   fullName: string;
   role: 'ADMINISTRATOR' | 'TECHNICIAN';
+  requiresPasswordChange?: boolean;
 }
 
 export async function signIn(username: string, password: string): Promise<Session> {
   return request<Session>('/session', { method: 'POST', body: { username, password } });
+}
+
+export async function changePassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  return request<void>('/session/change-password', {
+    method: 'POST',
+    body: { currentPassword, newPassword },
+    token,
+  });
 }
 
 export function readStoredSession(): Session | null {

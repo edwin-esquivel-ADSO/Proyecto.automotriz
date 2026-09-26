@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Domain errors. The transport layer maps each one to a status code; no layer
 // below transport knows anything about HTTP.
@@ -31,4 +34,6 @@ var (
 	ErrLastAdministrator = errors.New("cannot deactivate the last active administrator")
 	// ErrTechnicianInactive is returned when attempting to assign a service order to an inactive technician.
 	ErrTechnicianInactive = errors.New("technician is inactive")
+	// ErrWeakPassword is returned when a password does not satisfy security complexity requirements.
+	ErrWeakPassword = fmt.Errorf("%w: password does not meet complexity requirements", ErrInvalidInput)
 )

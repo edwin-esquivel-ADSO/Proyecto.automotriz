@@ -24,22 +24,28 @@ func (r Role) Valid() bool {
 // User is an authentication account. The plain password never reaches this
 // struct: only the hash produced by the authentication use case does.
 type User struct {
-	ID           string
-	Username     string
-	PasswordHash string
-	Role         Role
-	FullName     string
-	IsActive     bool
-	CreatedAt    time.Time
+	ID                     string
+	Username               string
+	PasswordHash           string
+	Role                   Role
+	FullName               string
+	IsActive               bool
+	RequiresPasswordChange bool
+	CreatedAt              time.Time
 }
 
-// NewUser builds a user after validating the rules that must always hold. Defaults IsActive to true.
+// NewUser builds a user after validating the rules that must always hold. Defaults IsActive to true and RequiresPasswordChange to false.
 func NewUser(id, username, passwordHash, fullName string, role Role, createdAt time.Time) (User, error) {
 	return NewUserWithStatus(id, username, passwordHash, fullName, role, true, createdAt)
 }
 
 // NewUserWithStatus builds a user with an explicit active status after validating invariants.
 func NewUserWithStatus(id, username, passwordHash, fullName string, role Role, isActive bool, createdAt time.Time) (User, error) {
+	return NewUserWithSecurity(id, username, passwordHash, fullName, role, isActive, false, createdAt)
+}
+
+// NewUserWithSecurity builds a user with explicit active and password-change flags.
+func NewUserWithSecurity(id, username, passwordHash, fullName string, role Role, isActive, requiresPasswordChange bool, createdAt time.Time) (User, error) {
 	username = strings.TrimSpace(username)
 	fullName = strings.TrimSpace(fullName)
 	if id == "" {
@@ -58,13 +64,14 @@ func NewUserWithStatus(id, username, passwordHash, fullName string, role Role, i
 		return User{}, fmt.Errorf("%w: unknown role %q", ErrInvalidInput, role)
 	}
 	return User{
-		ID:           id,
-		Username:     username,
-		PasswordHash: passwordHash,
-		Role:         role,
-		FullName:     fullName,
-		IsActive:     isActive,
-		CreatedAt:    createdAt,
+		ID:                     id,
+		Username:               username,
+		PasswordHash:           passwordHash,
+		Role:                   role,
+		FullName:               fullName,
+		IsActive:               isActive,
+		RequiresPasswordChange: requiresPasswordChange,
+		CreatedAt:              createdAt,
 	}, nil
 }
 

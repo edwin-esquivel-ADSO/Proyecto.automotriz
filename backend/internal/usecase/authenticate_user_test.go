@@ -46,6 +46,18 @@ func (f *fakeUserRepository) FindByID(_ context.Context, id string) (domain.User
 	return domain.User{}, domain.ErrNotFound
 }
 
+func (f *fakeUserRepository) UpdatePassword(_ context.Context, userID, passwordHash string) error {
+	for k, item := range f.user {
+		if item.ID == userID {
+			item.PasswordHash = passwordHash
+			item.RequiresPasswordChange = false
+			f.user[k] = item
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
 type fakeTokenIssuer struct {
 	issued int
 }
@@ -159,6 +171,35 @@ func TestExactUserCredentialsAuthentication(t *testing.T) {
 		if session.Role != data.role {
 			t.Errorf("expected role %s for %s, got %s", data.role, u, session.Role)
 		}
+	}
+}
+
+func TestChangePassword(t *testing.T) {
+	users := newFakeUserRepository(t, "admin", "Admin2026*")
+	useCase := usecase.NewAuthenticateUser(users, &fakeTokenIssuer{}, fixedClock())
+
+	// Test wrong current password
+	err := useCase.ChangePassword(context.Background(), "user-1", "WrongOld*", "NewSecret2026*")
+	if !errors.Is(err, domain.ErrUnauthorized) {
+		t.Fatalf("expected ErrUnauthorized for wrong current password, got %v", err)
+	}
+
+	// Test weak new password
+	err = useCase.ChangePassword(context.Background(), "user-1", "Admin2026*", "weak")
+	if !errors.Is(err, domain.ErrWeakPassword) {
+		t.Fatalf("expected ErrWeakPassword for short password, got %v", err)
+	}
+
+	// Test successful change
+	err = useCase.ChangePassword(context.Background(), "user-1", "Admin2026*", "NewSecret2026*")
+	if err != nil {
+		t.Fatalf("expected successful password change, got %v", err)
+	}
+
+	// Verify new password works
+	_, err = useCase.Execute(context.Background(), "admin", "NewSecret2026*")
+	if err != nil {
+		t.Fatalf("login with new password failed: %v", err)
 	}
 }
 

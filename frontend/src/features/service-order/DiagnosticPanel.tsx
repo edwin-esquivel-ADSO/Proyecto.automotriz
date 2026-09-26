@@ -7,7 +7,7 @@ import { findDiagnostic, recordDiagnostic } from '../../services/service_order_s
 import type { OrderPermissions } from '../../services/service_order_service';
 import { ErrorBanner, SuccessBanner } from '../../shared/DataState';
 import { useAsyncData } from '../../shared/useAsyncData';
-import { useSession, useToken } from '../../shared/SessionContext';
+import { useToken } from '../../shared/SessionContext';
 import { formatDateTime } from '../../shared/format';
 
 interface DiagnosticPanelProps {
@@ -15,6 +15,7 @@ interface DiagnosticPanelProps {
   onChange: () => void;
   orderPermissions?: OrderPermissions;
   permissions?: OrderPermissions;
+  isDelivered?: boolean;
 }
 
 export function DiagnosticPanel({
@@ -22,9 +23,9 @@ export function DiagnosticPanel({
   onChange,
   orderPermissions,
   permissions,
+  isDelivered,
 }: DiagnosticPanelProps) {
   const token = useToken();
-  const { isAdministrator } = useSession();
   const diagnostic = useAsyncData(
     () =>
       findDiagnostic(token, serviceOrderId).catch((failure: unknown) => {
@@ -43,9 +44,10 @@ export function DiagnosticPanel({
 
   const activePermissions = orderPermissions ?? permissions;
   const canAddDiagnostic =
-    activePermissions !== undefined
-      ? activePermissions.canAddDiagnostic === true
-      : !isAdministrator && !diagnostic.data;
+    !isDelivered &&
+    !diagnostic.data &&
+    activePermissions !== undefined &&
+    activePermissions.canAddDiagnostic === true;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();

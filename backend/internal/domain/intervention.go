@@ -16,6 +16,15 @@ type PartUsage struct {
 	CreatedAt      time.Time
 }
 
+// InterventionWarranty summarizes warranty coverage linked to an intervention.
+type InterventionWarranty struct {
+	ID                 string
+	Valid              bool
+	Kind               string
+	CoverageMonthCount int
+	ExpirationDate     time.Time
+}
+
 // Intervention is one physical action executed on the vehicle inside a
 // service order, with the labor hours it consumed and the parts it used.
 type Intervention struct {
@@ -27,6 +36,7 @@ type Intervention struct {
 	PerformedAt    time.Time
 	CreatedAt      time.Time
 	Part           []PartUsage
+	Warranty       *InterventionWarranty
 }
 
 // NewPartUsage builds a part usage after validating its quantity.

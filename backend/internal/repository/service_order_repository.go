@@ -179,7 +179,7 @@ func (r ServiceOrderRepository) ListTransition(ctx context.Context, serviceOrder
 		"SELECT st.id, st.service_order_id, st.from_status, st.to_status, st.changed_by_user_id, COALESCE(u.full_name, ''), st.changed_at "+
 			"FROM status_transition st "+
 			"LEFT JOIN `user` u ON u.id = st.changed_by_user_id "+
-			"WHERE st.service_order_id = ? ORDER BY st.changed_at ASC, st.id ASC",
+			"WHERE st.service_order_id = ? ORDER BY st.changed_at ASC, FIELD(st.to_status, 'RECEIVED', 'IN_DIAGNOSIS', 'IN_REPAIR', 'READY', 'DELIVERED') ASC, st.id ASC",
 		serviceOrderID,
 	)
 	if err != nil {

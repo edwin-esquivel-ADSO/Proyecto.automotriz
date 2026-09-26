@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   role VARCHAR(40) NOT NULL,
   full_name VARCHAR(160) NOT NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
+  requires_password_change TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT pk_user PRIMARY KEY (id),
   CONSTRAINT uq_user_username UNIQUE (username),
@@ -186,7 +187,7 @@ CREATE TABLE IF NOT EXISTS status_transition (
   from_status VARCHAR(40) NOT NULL,
   to_status VARCHAR(40) NOT NULL,
   changed_by_user_id CHAR(36) NOT NULL,
-  changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  changed_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   CONSTRAINT pk_status_transition PRIMARY KEY (id),
   CONSTRAINT fk_status_transition_service_order FOREIGN KEY (service_order_id)
     REFERENCES service_order (id) ON DELETE CASCADE,

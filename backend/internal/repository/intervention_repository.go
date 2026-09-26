@@ -79,11 +79,15 @@ func (r InterventionRepository) FindByID(ctx context.Context, id string) (domain
 	return intervention, nil
 }
 
-// ListByServiceOrder reads the interventions of an order, oldest first.
+// ListByServiceOrder reads the interventions of an order, oldest first, with their warranty coverage if issued.
 func (r InterventionRepository) ListByServiceOrder(ctx context.Context, serviceOrderID string) ([]domain.Intervention, error) {
 	return r.list(
 		ctx,
-		"SELECT "+interventionColumn+" FROM intervention WHERE service_order_id = ? ORDER BY performed_at",
+		"SELECT i.id, i.service_order_id, i.technician_id, i.description, i.labor_hour_count, "+
+			"i.performed_at, i.created_at, w.id, w.warranty_kind, w.coverage_month_count, w.expiration_date "+
+			"FROM intervention i "+
+			"LEFT JOIN warranty w ON w.intervention_id = i.id "+
+			"WHERE i.service_order_id = ? ORDER BY i.performed_at",
 		serviceOrderID,
 	)
 }
@@ -93,8 +97,10 @@ func (r InterventionRepository) ListByVehicle(ctx context.Context, vehicleID str
 	return r.list(
 		ctx,
 		"SELECT i.id, i.service_order_id, i.technician_id, i.description, i.labor_hour_count, "+
-			"i.performed_at, i.created_at FROM intervention i "+
+			"i.performed_at, i.created_at, w.id, w.warranty_kind, w.coverage_month_count, w.expiration_date "+
+			"FROM intervention i "+
 			"JOIN service_order so ON so.id = i.service_order_id "+
+			"LEFT JOIN warranty w ON w.intervention_id = i.id "+
 			"WHERE so.vehicle_id = ? ORDER BY i.performed_at",
 		vehicleID,
 	)
@@ -111,14 +117,29 @@ func (r InterventionRepository) list(ctx context.Context, query, argument string
 	defer func() { _ = rows.Close() }()
 
 	listed := make([]domain.Intervention, 0)
+	now := time.Now()
 	for rows.Next() {
 		var intervention domain.Intervention
+		var warrantyID, warrantyKind sql.NullString
+		var coverageMonths sql.NullInt32
+		var expirationDate sql.NullTime
 		if err := rows.Scan(
 			&intervention.ID, &intervention.ServiceOrderID, &intervention.TechnicianID,
 			&intervention.Description, &intervention.LaborHourCount,
 			&intervention.PerformedAt, &intervention.CreatedAt,
+			&warrantyID, &warrantyKind, &coverageMonths, &expirationDate,
 		); err != nil {
 			return nil, translate(err)
+		}
+		if warrantyID.Valid && warrantyID.String != "" {
+			valid := expirationDate.Valid && !expirationDate.Time.Before(now)
+			intervention.Warranty = &domain.InterventionWarranty{
+				ID:                 warrantyID.String,
+				Valid:              valid,
+				Kind:               warrantyKind.String,
+				CoverageMonthCount: int(coverageMonths.Int32),
+				ExpirationDate:     expirationDate.Time,
+			}
 		}
 		listed = append(listed, intervention)
 	}

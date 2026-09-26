@@ -19,12 +19,13 @@ type signInRequest struct {
 // sessionResponse is what a successful sign in returns. It never carries the
 // password hash.
 type sessionResponse struct {
-	Token     string `json:"token"`
-	ExpiresAt string `json:"expiresAt"`
-	UserID    string `json:"userId"`
-	Username  string `json:"username"`
-	FullName  string `json:"fullName"`
-	Role      string `json:"role"`
+	Token                  string `json:"token"`
+	ExpiresAt              string `json:"expiresAt"`
+	UserID                 string `json:"userId"`
+	Username               string `json:"username"`
+	FullName               string `json:"fullName"`
+	Role                   string `json:"role"`
+	RequiresPasswordChange bool   `json:"requiresPasswordChange"`
 }
 
 // AuthHandler exposes the sign in operation.
@@ -80,11 +81,36 @@ func (h AuthHandler) SignIn(writer http.ResponseWriter, request *http.Request) {
 
 	h.limiter.Reset(clientIP, payload.Username)
 	respond(writer, http.StatusOK, sessionResponse{
-		Token:     session.Token,
-		ExpiresAt: formatTime(session.ExpiresAt),
-		UserID:    session.UserID,
-		Username:  session.Username,
-		FullName:  session.FullName,
-		Role:      string(session.Role),
+		Token:                  session.Token,
+		ExpiresAt:              formatTime(session.ExpiresAt),
+		UserID:                 session.UserID,
+		Username:               session.Username,
+		FullName:               session.FullName,
+		Role:                   string(session.Role),
+		RequiresPasswordChange: session.RequiresPasswordChange,
 	})
+}
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
+// ChangePassword allows an authenticated user to change their password and clear requires_password_change.
+func (h AuthHandler) ChangePassword(writer http.ResponseWriter, request *http.Request) {
+	identity, err := callerFrom(request.Context())
+	if err != nil {
+		failure(writer, err)
+		return
+	}
+	var payload changePasswordRequest
+	if err := decode(writer, request, &payload); err != nil {
+		failure(writer, err)
+		return
+	}
+	if err := h.authenticate.ChangePassword(request.Context(), identity.UserID, payload.CurrentPassword, payload.NewPassword); err != nil {
+		failure(writer, err)
+		return
+	}
+	respond(writer, http.StatusOK, map[string]string{"message": "contraseña actualizada exitosamente"})
 }

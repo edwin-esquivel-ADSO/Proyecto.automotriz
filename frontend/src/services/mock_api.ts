@@ -23,7 +23,46 @@ import type { Session } from './session_service';
 
 const DB_KEY = 'workshop.demo.db.v2';
 
+export interface MockUser {
+  id: string;
+  username: string;
+  password: string;
+  fullName: string;
+  role: 'ADMINISTRATOR' | 'TECHNICIAN';
+  requiresPasswordChange: boolean;
+}
+
+export function getDefaultUsers(): MockUser[] {
+  return [
+    {
+      id: '11111111-1111-4111-8111-111111111111',
+      username: 'admin',
+      password: 'Admin2026*',
+      fullName: 'Administrador del taller',
+      role: 'ADMINISTRATOR',
+      requiresPasswordChange: false,
+    },
+    {
+      id: '22222222-2222-4222-8222-222222222222',
+      username: 'jperez',
+      password: 'Admin2026*',
+      fullName: 'Juan Perez',
+      role: 'TECHNICIAN',
+      requiresPasswordChange: false,
+    },
+    {
+      id: '33333333-3333-4333-8333-333333333333',
+      username: 'lramirez',
+      password: 'Admin2026*',
+      fullName: 'Laura Ramirez',
+      role: 'TECHNICIAN',
+      requiresPasswordChange: false,
+    },
+  ];
+}
+
 interface MockDatabase {
+  users?: MockUser[];
   customers: Customer[];
   vehicles: Vehicle[];
   technicians: Technician[];
@@ -142,6 +181,7 @@ function getInitialData(): MockDatabase {
   };
 
   return {
+    users: getDefaultUsers(),
     customers: [customer1, customer2],
     vehicles: [vehicle1, vehicle2],
     technicians: [tech1, tech2],
@@ -158,7 +198,12 @@ function loadDB(): MockDatabase {
   try {
     const raw = localStorage.getItem(DB_KEY);
     if (raw) {
-      return JSON.parse(raw) as MockDatabase;
+      const parsed = JSON.parse(raw) as MockDatabase;
+      if (!parsed.users || parsed.users.length === 0) {
+        parsed.users = getDefaultUsers();
+        saveDB(parsed);
+      }
+      return parsed;
     }
   } catch {
     // Local storage not accessible
@@ -281,7 +326,9 @@ export function setupBrowserMockApi(): void {
       const validJPerezPass = [...validSharedPass, 'JPerez2026*', 'jperez2026*'];
       const validLRamirezPass = [...validSharedPass, 'LRamirez2026*', 'lramirez2026*'];
 
-      if (username === 'admin' && validSharedPass.includes(password)) {
+      const user = db.users?.find((u) => u.username.toLowerCase() === username);
+
+      if (username === 'admin' && (validSharedPass.includes(password) || user?.password === password)) {
         const session: Session = {
           token: 'token-admin-session-mock',
           expiresAt: new Date(Date.now() + 8 * 3600 * 1000).toISOString(),
@@ -289,10 +336,11 @@ export function setupBrowserMockApi(): void {
           username: 'admin',
           fullName: 'Administrador del taller',
           role: 'ADMINISTRATOR',
+          requiresPasswordChange: user ? user.requiresPasswordChange : false,
         };
         return jsonResponse(session);
       }
-      if (username === 'jperez' && validJPerezPass.includes(password)) {
+      if (username === 'jperez' && (validJPerezPass.includes(password) || user?.password === password)) {
         const session: Session = {
           token: 'token-jperez-session-mock',
           expiresAt: new Date(Date.now() + 8 * 3600 * 1000).toISOString(),
@@ -300,10 +348,11 @@ export function setupBrowserMockApi(): void {
           username: 'jperez',
           fullName: 'Juan Perez',
           role: 'TECHNICIAN',
+          requiresPasswordChange: user ? user.requiresPasswordChange : false,
         };
         return jsonResponse(session);
       }
-      if (username === 'lramirez' && validLRamirezPass.includes(password)) {
+      if (username === 'lramirez' && (validLRamirezPass.includes(password) || user?.password === password)) {
         const session: Session = {
           token: 'token-lramirez-session-mock',
           expiresAt: new Date(Date.now() + 8 * 3600 * 1000).toISOString(),
@@ -311,10 +360,67 @@ export function setupBrowserMockApi(): void {
           username: 'lramirez',
           fullName: 'Laura Ramirez',
           role: 'TECHNICIAN',
+          requiresPasswordChange: user ? user.requiresPasswordChange : false,
+        };
+        return jsonResponse(session);
+      }
+      if (user && user.password === password) {
+        const session: Session = {
+          token: `token-${user.id}-session-mock`,
+          expiresAt: new Date(Date.now() + 8 * 3600 * 1000).toISOString(),
+          userId: user.id,
+          username: user.username,
+          fullName: user.fullName,
+          role: user.role,
+          requiresPasswordChange: user.requiresPasswordChange,
         };
         return jsonResponse(session);
       }
       return errorResponse(401, 'unauthorized', 'Credenciales invalidas. Verifique su usuario y contrasena.');
+    }
+
+    // 1.1 Change Password
+    if (pathname === '/api/session/change-password' && method === 'POST') {
+      if (!token) {
+        return errorResponse(401, 'unauthorized', 'Sesión no válida o expirada.');
+      }
+      const { currentPassword, newPassword } = body || {};
+      if (!currentPassword || !newPassword) {
+        return errorResponse(400, 'bad_request', 'La contraseña actual y la nueva son requeridas.');
+      }
+      const hasLength = newPassword.length >= 8;
+      const hasUpper = /[A-Z]/.test(newPassword);
+      const hasLower = /[a-z]/.test(newPassword);
+      const hasDigit = /[0-9]/.test(newPassword);
+      const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
+      if (!hasLength || !hasUpper || !hasLower || !hasDigit || !hasSpecial) {
+        return errorResponse(
+          400,
+          'weak_password',
+          'La contraseña no cumple con los requisitos de complejidad (mínimo 8 caracteres, mayúscula, minúscula, número y caracter especial).',
+        );
+      }
+
+      const user = db.users?.find((u) =>
+        (isCallerAdmin && u.username === 'admin') ||
+        (isCallerJPerez && u.username === 'jperez') ||
+        (isCallerLRamirez && u.username === 'lramirez') ||
+        token.includes(u.id),
+      );
+      if (!user) {
+        return errorResponse(401, 'unauthorized', 'Usuario de la sesión no encontrado.');
+      }
+      const validPasswords = [user.password, 'Admin2026*'];
+      if (user.username === 'jperez') validPasswords.push('JPerez2026*');
+      if (user.username === 'lramirez') validPasswords.push('LRamirez2026*');
+      if (!validPasswords.includes(currentPassword)) {
+        return errorResponse(401, 'unauthorized', 'Contraseña actual incorrecta.');
+      }
+
+      user.password = newPassword;
+      user.requiresPasswordChange = false;
+      saveDB(db);
+      return jsonResponse({ ok: true, message: 'Contraseña actualizada exitosamente.' });
     }
 
     if (pathname === '/api/session/logout' && method === 'POST') {
@@ -453,7 +559,11 @@ export function setupBrowserMockApi(): void {
       if (method === 'GET') {
         const updatedTechnicians = db.technicians.map((tech) => {
           const isActive = tech.isActive !== false;
-          const activeAssignment = db.assignments.find((a) => a.technicianId === tech.id && a.isActive);
+          const activeAssignment = db.assignments.find((a) => {
+            if (a.technicianId !== tech.id || !a.isActive) return false;
+            const relatedOrder = db.orders.find((o) => o.id === a.serviceOrderId);
+            return relatedOrder && relatedOrder.status !== 'DELIVERED';
+          });
           const busy = Boolean(activeAssignment);
           const canReceiveAssignment = isActive && !busy;
           if (activeAssignment) {
@@ -485,9 +595,22 @@ export function setupBrowserMockApi(): void {
         if (!fullName || !username || !password || !specialty) {
           return errorResponse(400, 'bad_request', 'Todos los campos son obligatorios.');
         }
+        const hasLength = password.length >= 8;
+        const hasUpper = /[A-Z]/.test(password);
+        const hasLower = /[a-z]/.test(password);
+        const hasDigit = /[0-9]/.test(password);
+        const hasSpecial = /[^A-Za-z0-9]/.test(password);
+        if (!hasLength || !hasUpper || !hasLower || !hasDigit || !hasSpecial) {
+          return errorResponse(
+            400,
+            'weak_password',
+            'La contraseña no cumple con los requisitos de complejidad (mínimo 8 caracteres, mayúscula, minúscula, número y caracter especial).',
+          );
+        }
+        const techUserId = crypto.randomUUID ? crypto.randomUUID() : 'u-' + Date.now();
         const newTech: Technician = {
           id: crypto.randomUUID ? crypto.randomUUID() : 't-' + Date.now(),
-          userId: crypto.randomUUID ? crypto.randomUUID() : 'u-' + Date.now(),
+          userId: techUserId,
           fullName,
           specialty,
           isActive: true,
@@ -498,6 +621,15 @@ export function setupBrowserMockApi(): void {
           activeVehiclePlate: '',
         };
         db.technicians.push(newTech);
+        if (!db.users) db.users = getDefaultUsers();
+        db.users.push({
+          id: techUserId,
+          username: username.trim().toLowerCase(),
+          password,
+          fullName,
+          role: 'TECHNICIAN',
+          requiresPasswordChange: true,
+        });
         saveDB(db);
         return jsonResponse(newTech, 201);
       }
@@ -515,7 +647,11 @@ export function setupBrowserMockApi(): void {
       }
       const active = Boolean(body?.active);
       tech.isActive = active;
-      const activeAssignment = db.assignments.find((a) => a.technicianId === tech.id && a.isActive);
+      const activeAssignment = db.assignments.find((a) => {
+        if (a.technicianId !== tech.id || !a.isActive) return false;
+        const relatedOrder = db.orders.find((o) => o.id === a.serviceOrderId);
+        return relatedOrder && relatedOrder.status !== 'DELIVERED';
+      });
       tech.busy = Boolean(activeAssignment);
       tech.canReceiveAssignment = active && !tech.busy;
       saveDB(db);
@@ -731,20 +867,18 @@ export function setupBrowserMockApi(): void {
       if (method === 'POST') {
         const order = db.orders.find((o) => o.id === orderId);
         if (order?.status === 'DELIVERED') {
-          return errorResponse(403, 'forbidden', 'No se puede registrar diagnostico en una orden entregada.');
+          return errorResponse(409, 'conflict', 'No se puede registrar diagnostico en una orden entregada.');
         }
-        if (isCallerTechnician && callerTechId) {
-          const activeAss = db.assignments.find((a) => a.serviceOrderId === orderId && a.isActive);
-          if (!activeAss || activeAss.technicianId !== callerTechId) {
-            return errorResponse(403, 'forbidden', 'Solo el tecnico asignado puede registrar diagnosticos.');
-          }
+        const activeAss = db.assignments.find((a) => a.serviceOrderId === orderId && a.isActive);
+        if (!isCallerTechnician || !callerTechId || !activeAss || activeAss.technicianId !== callerTechId) {
+          return errorResponse(403, 'forbidden', 'Solo el tecnico asignado puede registrar diagnosticos.');
         }
         const { finding, componentToRepair } = body || {};
-        const assignment = db.assignments.find((a) => a.serviceOrderId === orderId && a.isActive);
+        const assignment = activeAss;
         const newDiagnostic: Diagnostic = {
           id: crypto.randomUUID ? crypto.randomUUID() : 'd-' + Date.now(),
           serviceOrderId: orderId,
-          technicianId: assignment?.technicianId || 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+          technicianId: assignment.technicianId,
           finding,
           componentToRepair,
           createdAt: new Date().toISOString(),
@@ -781,16 +915,14 @@ export function setupBrowserMockApi(): void {
       if (method === 'POST') {
         const order = db.orders.find((o) => o.id === orderId);
         if (order?.status === 'DELIVERED') {
-          return errorResponse(403, 'forbidden', 'No se puede registrar intervencion en una orden entregada.');
+          return errorResponse(409, 'conflict', 'No se puede registrar intervencion en una orden entregada.');
         }
-        if (isCallerTechnician && callerTechId) {
-          const activeAss = db.assignments.find((a) => a.serviceOrderId === orderId && a.isActive);
-          if (!activeAss || activeAss.technicianId !== callerTechId) {
-            return errorResponse(403, 'forbidden', 'Solo el tecnico asignado puede registrar intervenciones.');
-          }
+        const activeAss = db.assignments.find((a) => a.serviceOrderId === orderId && a.isActive);
+        if (!isCallerTechnician || !callerTechId || !activeAss || activeAss.technicianId !== callerTechId) {
+          return errorResponse(403, 'forbidden', 'Solo el tecnico asignado puede registrar intervenciones.');
         }
         const { description, laborHourCount, part } = body || {};
-        const assignment = db.assignments.find((a) => a.serviceOrderId === orderId && a.isActive);
+        const assignment = activeAss;
         const newIntervention: Intervention = {
           id: crypto.randomUUID ? crypto.randomUUID() : 'i-' + Date.now(),
           serviceOrderId: orderId,
@@ -857,9 +989,19 @@ export function setupBrowserMockApi(): void {
       }));
 
       const busyTechnicians = db.technicians
-        .filter((t) => db.assignments.some((a) => a.technicianId === t.id && a.isActive))
+        .filter((t) =>
+          db.assignments.some((a) => {
+            if (a.technicianId !== t.id || !a.isActive) return false;
+            const ord = db.orders.find((o) => o.id === a.serviceOrderId);
+            return ord && ord.status !== 'DELIVERED';
+          }),
+        )
         .map((t) => {
-          const a = db.assignments.find((asg) => asg.technicianId === t.id && asg.isActive);
+          const a = db.assignments.find((asg) => {
+            if (asg.technicianId !== t.id || !asg.isActive) return false;
+            const ord = db.orders.find((o) => o.id === asg.serviceOrderId);
+            return ord && ord.status !== 'DELIVERED';
+          });
           const ord = db.orders.find((o) => o.id === a?.serviceOrderId);
           return {
             ...t,

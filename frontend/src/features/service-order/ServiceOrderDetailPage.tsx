@@ -117,12 +117,14 @@ export function ServiceOrderDetailPage() {
             serviceOrderId={serviceOrderId}
             orderPermissions={current?.permissions}
             permissions={current?.permissions}
+            isDelivered={current?.status === 'DELIVERED'}
             onChange={() => order.reload()}
           />
           <InterventionPanel
             serviceOrderId={serviceOrderId}
             orderPermissions={current?.permissions}
             permissions={current?.permissions}
+            isDelivered={current?.status === 'DELIVERED'}
             onChange={() => order.reload()}
           />
           <StatusHistoryPanel serviceOrderId={serviceOrderId} refreshToken={historyToken} />

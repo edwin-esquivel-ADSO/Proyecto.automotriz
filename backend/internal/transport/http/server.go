@@ -92,6 +92,7 @@ func NewServer(dependency Dependency) *http.Server {
 	protected.HandleFunc("GET /api/warranty", warrantyHandler.List)
 	protected.HandleFunc("POST /api/warranty", warrantyHandler.Issue)
 	protected.HandleFunc("GET /api/dashboard", dashboardHandler.Build)
+	protected.HandleFunc("POST /api/session/change-password", authHandler.ChangePassword)
 
 	root := http.NewServeMux()
 	root.HandleFunc("GET /{$}", index)

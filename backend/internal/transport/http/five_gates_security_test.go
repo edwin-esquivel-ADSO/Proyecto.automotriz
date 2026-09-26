@@ -39,6 +39,18 @@ func (s *fgUserStore) FindByID(_ context.Context, id string) (domain.User, error
 	return domain.User{}, domain.ErrNotFound
 }
 
+func (s *fgUserStore) UpdatePassword(_ context.Context, userID, newPasswordHash string) error {
+	for k, u := range s.user {
+		if u.ID == userID {
+			u.PasswordHash = newPasswordHash
+			u.RequiresPasswordChange = false
+			s.user[k] = u
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
 type fgTechStore struct {
 	mu     sync.Mutex
 	techs  map[string]domain.Technician

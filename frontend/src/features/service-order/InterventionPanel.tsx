@@ -21,6 +21,7 @@ interface InterventionPanelProps {
   onChange: () => void;
   orderPermissions?: OrderPermissions;
   permissions?: OrderPermissions;
+  isDelivered?: boolean;
 }
 
 const EMPTY_PART: PartUsage = { partName: '', quantity: 1 };
@@ -30,6 +31,7 @@ export function InterventionPanel({
   onChange,
   orderPermissions,
   permissions,
+  isDelivered,
 }: InterventionPanelProps) {
   const token = useToken();
   const { isAdministrator } = useSession();
@@ -54,9 +56,9 @@ export function InterventionPanel({
 
   const activePermissions = orderPermissions ?? permissions;
   const canAddIntervention =
-    activePermissions !== undefined
-      ? activePermissions.canAddIntervention === true
-      : !isAdministrator;
+    !isDelivered &&
+    activePermissions !== undefined &&
+    activePermissions.canAddIntervention === true;
 
   const updatePart = (index: number, field: keyof PartUsage, value: string) =>
     setPart((previous) =>
@@ -207,6 +209,10 @@ export function InterventionPanel({
             </button>
           </div>
         </form>
+      ) : isDelivered ? (
+        <p className="state-message">
+          Esta orden está entregada (cerrada). El registro de intervenciones está bloqueado.
+        </p>
       ) : (
         <p className="state-message">
           No tienes permisos para registrar intervenciones en esta orden o el estado actual no lo permite.

@@ -1,5 +1,10 @@
 package domain
 
+import (
+	"fmt"
+	"unicode"
+)
+
 // OrderPermissions describes the allowed operations for a specific user on a service order.
 type OrderPermissions struct {
 	CanAdvance         bool `json:"canAdvance"`
@@ -17,7 +22,7 @@ func CalculateOrderPermissions(
 	order ServiceOrder,
 	activeTechnicianID string,
 ) OrderPermissions {
-	if !order.Status.IsOpen() {
+	if !order.Status.IsOpen() || order.Status == StatusDelivered {
 		return OrderPermissions{}
 	}
 
@@ -37,7 +42,8 @@ func CalculateOrderPermissions(
 			CanAssign:          order.Status.CanAssignTechnician(),
 		}
 	case RoleTechnician:
-		if actorTechnicianID == "" || actorTechnicianID != activeTechnicianID {
+		// Strict isolation: if order is unassigned, actor is empty, or actor is not the assigned technician
+		if actorTechnicianID == "" || activeTechnicianID == "" || actorTechnicianID != activeTechnicianID {
 			return OrderPermissions{}
 		}
 		return OrderPermissions{
@@ -49,4 +55,41 @@ func CalculateOrderPermissions(
 	default:
 		return OrderPermissions{}
 	}
+}
+
+// ValidatePasswordComplexity enforces that passwords must have at least 8 characters,
+// with at least one uppercase letter, one lowercase letter, one digit, and one special character.
+func ValidatePasswordComplexity(password string) error {
+	if len(password) < 8 {
+		return fmt.Errorf("%w: password must be at least 8 characters long", ErrWeakPassword)
+	}
+
+	var hasUpper, hasLower, hasDigit, hasSpecial bool
+	for _, char := range password {
+		switch {
+		case unicode.IsUpper(char):
+			hasUpper = true
+		case unicode.IsLower(char):
+			hasLower = true
+		case unicode.IsDigit(char):
+			hasDigit = true
+		case unicode.IsPunct(char) || unicode.IsSymbol(char):
+			hasSpecial = true
+		}
+	}
+
+	if !hasUpper {
+		return fmt.Errorf("%w: password must contain at least one uppercase letter", ErrWeakPassword)
+	}
+	if !hasLower {
+		return fmt.Errorf("%w: password must contain at least one lowercase letter", ErrWeakPassword)
+	}
+	if !hasDigit {
+		return fmt.Errorf("%w: password must contain at least one number", ErrWeakPassword)
+	}
+	if !hasSpecial {
+		return fmt.Errorf("%w: password must contain at least one special character", ErrWeakPassword)
+	}
+
+	return nil
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 
 import { useSession } from '../shared/SessionContext';
+import { ChangePasswordModal } from '../features/login/ChangePasswordModal';
 
 interface NavigationItem {
   to: string;
@@ -74,6 +75,7 @@ export function AppLayout() {
       <main className="app-main">
         <Outlet />
       </main>
+      <ChangePasswordModal />
     </>
   );
 }

@@ -49,6 +49,18 @@ func (f *fakeUserStore) FindByID(_ context.Context, id string) (domain.User, err
 	return domain.User{}, domain.ErrNotFound
 }
 
+func (f *fakeUserStore) UpdatePassword(_ context.Context, userID, newPasswordHash string) error {
+	for k, item := range f.user {
+		if item.ID == userID {
+			item.PasswordHash = newPasswordHash
+			item.RequiresPasswordChange = false
+			f.user[k] = item
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
 func signIn(t *testing.T, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	limiter := NewLoginRateLimiter()

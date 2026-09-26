@@ -18,6 +18,8 @@ interface SessionContextValue {
   signIn: (username: string, password: string) => Promise<void>;
   signOut: () => void;
   isAdministrator: boolean;
+  requiresPasswordChange: boolean;
+  onPasswordChanged: () => void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -36,14 +38,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, []);
 
+  const onPasswordChanged = useCallback(() => {
+    setSession((previous) => {
+      if (!previous) return null;
+      const updated = { ...previous, requiresPasswordChange: false };
+      storeSession(updated);
+      return updated;
+    });
+  }, []);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       session,
       signIn,
       signOut,
       isAdministrator: session?.role === 'ADMINISTRATOR',
+      requiresPasswordChange: Boolean(session?.requiresPasswordChange),
+      onPasswordChanged,
     }),
-    [session, signIn, signOut],
+    [session, signIn, signOut, onPasswordChanged],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

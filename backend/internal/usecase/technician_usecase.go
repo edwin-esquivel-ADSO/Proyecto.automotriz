@@ -65,8 +65,8 @@ func (t TechnicianUseCase) Create(ctx context.Context, fullName, username, passw
 	if len(username) < 3 {
 		return domain.Technician{}, fmt.Errorf("%w: el nombre de usuario debe tener al menos 3 caracteres", domain.ErrInvalidInput)
 	}
-	if len(password) < 8 {
-		return domain.Technician{}, fmt.Errorf("%w: la contraseña debe tener al menos 8 caracteres", domain.ErrInvalidInput)
+	if err := domain.ValidatePasswordComplexity(password); err != nil {
+		return domain.Technician{}, err
 	}
 	if len(specialty) < 3 {
 		return domain.Technician{}, fmt.Errorf("%w: la especialidad debe tener al menos 3 caracteres", domain.ErrInvalidInput)
@@ -82,7 +82,7 @@ func (t TechnicianUseCase) Create(ctx context.Context, fullName, username, passw
 	userID := t.newID()
 	techID := t.newID()
 
-	user, err := domain.NewUserWithStatus(userID, username, string(hash), fullName, domain.RoleTechnician, true, createdAt)
+	user, err := domain.NewUserWithSecurity(userID, username, string(hash), fullName, domain.RoleTechnician, true, true, createdAt)
 	if err != nil {
 		return domain.Technician{}, err
 	}

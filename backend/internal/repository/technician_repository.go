@@ -13,7 +13,7 @@ const technicianColumn = "id, user_id, specialty, created_at"
 // workloadSelect reads every technician with the order they currently hold and their account active status.
 const workloadSelect = "SELECT t.id, t.user_id, t.specialty, t.created_at, u.full_name, u.is_active, " +
 	"COALESCE(a.service_order_id, ''), COALESCE(so.order_number, ''), COALESCE(v.plate, ''), " +
-	"CASE WHEN a.id IS NOT NULL AND so.status IN ('IN_DIAGNOSIS', 'IN_REPAIR') THEN 1 ELSE 0 END AS is_busy " +
+	"CASE WHEN a.id IS NOT NULL AND so.status IS NOT NULL AND so.status != 'DELIVERED' THEN 1 ELSE 0 END AS is_busy " +
 	"FROM technician t " +
 	"JOIN `user` u ON u.id = t.user_id " +
 	"LEFT JOIN assignment a ON a.technician_id = t.id AND a.is_active = 1 " +
@@ -78,10 +78,14 @@ func (r TechnicianRepository) CreateWithAccount(ctx context.Context, user domain
 	if user.IsActive {
 		isActiveVal = 1
 	}
+	requiresPasswordChangeVal := 0
+	if user.RequiresPasswordChange {
+		requiresPasswordChangeVal = 1
+	}
 
 	_, err = tx.ExecContext(queryCtx,
-		"INSERT INTO `user` (id, username, password_hash, role, full_name, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		user.ID, user.Username, user.PasswordHash, string(user.Role), user.FullName, isActiveVal, user.CreatedAt,
+		"INSERT INTO `user` (id, username, password_hash, role, full_name, is_active, requires_password_change, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		user.ID, user.Username, user.PasswordHash, string(user.Role), user.FullName, isActiveVal, requiresPasswordChangeVal, user.CreatedAt,
 	)
 	if err != nil {
 		return translate(err)
@@ -180,7 +184,7 @@ func (r TechnicianRepository) FindWorkloadByTechnicianID(ctx context.Context, te
 
 	const singleWorkloadSelect = "SELECT t.id, t.user_id, t.specialty, t.created_at, u.full_name, u.is_active, " +
 		"COALESCE(a.service_order_id, ''), COALESCE(so.order_number, ''), COALESCE(v.plate, ''), " +
-		"CASE WHEN a.id IS NOT NULL AND so.status IN ('IN_DIAGNOSIS', 'IN_REPAIR') THEN 1 ELSE 0 END AS is_busy " +
+		"CASE WHEN a.id IS NOT NULL AND so.status IS NOT NULL AND so.status != 'DELIVERED' THEN 1 ELSE 0 END AS is_busy " +
 		"FROM technician t " +
 		"JOIN `user` u ON u.id = t.user_id " +
 		"LEFT JOIN assignment a ON a.technician_id = t.id AND a.is_active = 1 " +
